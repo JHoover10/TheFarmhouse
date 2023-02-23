@@ -177,32 +177,43 @@ public static class Extensions
         return list;
     }
 
+    public static async Task<T?> ToObject<T>(this HttpContent httpContent, Func<string, T>? manualMapping = null)
+    {
+        var content = await httpContent.ReadAsStringAsync();
+
+        if (manualMapping != null)
+        {
+            return manualMapping(content);
+        }
+
+        if (content == null)
+            return default(T);
+
+        if (content is T)
+            return (T)Convert.ChangeType(content, typeof(T));
+
+        return JsonConvert.DeserializeObject<T>(content);
+    }
+
     private static string GetSqlType<T>(this PropertyInfo property, T entity)
     {
         switch (property.PropertyType)
         {
-            case Type stringType when stringType == typeof(string):
+            case Type _ when property.PropertyType == typeof(string):
                 return "VARCHAR(MAX)";
-
-            case Type intType when intType == typeof(int):
+            case Type _ when property.PropertyType == typeof(Int32):
                 return "int";
-
-            case Type longType when longType == typeof(long):
+            case Type _ when property.PropertyType == typeof(Int64):
                 return "bigint";
-
-            case Type floatType when floatType == typeof(float):
-            case Type deciamlType when deciamlType == typeof(decimal):
+            case Type _ when property.PropertyType == typeof(float):
+            case Type _ when property.PropertyType == typeof(decimal):
                 return "DECIMAL(18, 2)";
-
-            case Type guidType when guidType == typeof(Guid):
+            case Type _ when property.PropertyType == typeof(Guid):
                 return "UNIQUEIDENTIFIER";
-
-            case Type dateTimeType when dateTimeType == typeof(DateTime):
+            case Type _ when property.PropertyType == typeof(DateTime):
                 return "DATETIME";
-
-            case Type dateOnlyType when dateOnlyType == typeof(DateOnly):
+            case Type _ when property.PropertyType == typeof(DateOnly):
                 return "DATE";
-
             default:
                 return null;
         }
