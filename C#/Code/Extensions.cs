@@ -9,6 +9,54 @@ namespace C_Sharp;
 
 public static class Extensions
 {
+    public static void BulkMerge<T>(this SqlConnection sqlConnection, IEnumerable<T> entity, string identityColumn = null, List<string> uniqueColumns = null)
+    {
+        using var sqlTransaction = sqlConnection.BeginTransaction();
+
+        try
+        {
+            var sqlCommand = sqlConnection.CreateCommand();
+            sqlCommand.Transaction = sqlTransaction;
+
+            var tempTableName = sqlCommand.ToTempTable(entity);
+
+            var onClause = new StringBuilder();
+            var updateClause = new StringBuilder("UPDATE SET ");
+            var insertColumns = new StringBuilder();
+            var insertValues = new StringBuilder();
+
+            foreach (var property in typeof(T).GetProperties())
+            {
+                updateClause.Append($"T.{property.Name} = S.{property.Name}, ");
+                insertColumns.Append($"{property.Name}, ");
+                insertValues.Append($"S.{property.Name}, ");
+            }
+
+            updateClause.Remove(updateClause.Length - 2, 2);
+            insertColumns.Remove(insertColumns.Length - 2, 2);
+            insertValues.Remove(insertValues.Length - 2, 2);
+
+            var query = 
+                @$"MERGE INTO {typeof(T).Name} T
+                USING {tempTableName} S
+                ON {onClause}
+                WHEN MATCH THEN
+                    {updateClause}
+                WHEN NOT MATCHED THEN
+                    INSERT ({insertColumns}) VALUES ({insertValues})";
+
+            sqlCommand.CommandText = query;
+            sqlCommand.ExecuteScalar();
+
+            sqlTransaction.Commit();
+        }
+        catch 
+        {
+            sqlTransaction.Rollback();
+            throw;
+        }
+    }
+
     public static string ToTempTable<T>(this SqlCommand sqlCommand, IEnumerable<T> entity, bool useGlobalTable = false)
     {
         var tempTableName = $"{(useGlobalTable ? "##" : "#")}{Guid.NewGuid().ToString("N")}";
@@ -16,7 +64,7 @@ public static class Extensions
 
         foreach (var property in typeof(T).GetProperties())
         {
-            tableColumns.AppendLine($"{property.Name} {property.GetSqlType(entity)},");
+            tableColumns.AppendLine($"{property.Name} {property.GetSqlType()},");
         }
 
         var query =
@@ -25,7 +73,7 @@ public static class Extensions
                 DROP TABLE {tempTableName}
             
             CREATE TABLE {tempTableName} (
-                {tableColumns.ToString()}
+                {tableColumns}
             )
             ";
 
@@ -195,19 +243,21 @@ public static class Extensions
         return JsonConvert.DeserializeObject<T>(content);
     }
 
-    private static string GetSqlType<T>(this PropertyInfo property, T entity)
+    private static string GetSqlType(this PropertyInfo property, string varcharLength = "MAX", int decimalPrecision = 18, int decimalScale = 2)
     {
         switch (property.PropertyType)
         {
             case Type _ when property.PropertyType == typeof(string):
-                return "VARCHAR(MAX)";
-            case Type _ when property.PropertyType == typeof(Int32):
+                return $"VARCHAR({varcharLength}})";
+            case Type _ when property.PropertyType == typeof(short):
+                return "smallint";
+            case Type _ when property.PropertyType == typeof(int):
                 return "int";
-            case Type _ when property.PropertyType == typeof(Int64):
+            case Type _ when property.PropertyType == typeof(long):
                 return "bigint";
             case Type _ when property.PropertyType == typeof(float):
             case Type _ when property.PropertyType == typeof(decimal):
-                return "DECIMAL(18, 2)";
+                return $"DECIMAL({decimalPrecision}, {decimalScale})";
             case Type _ when property.PropertyType == typeof(Guid):
                 return "UNIQUEIDENTIFIER";
             case Type _ when property.PropertyType == typeof(DateTime):
