@@ -248,7 +248,7 @@ public static class Extensions
         switch (property.PropertyType)
         {
             case Type _ when property.PropertyType == typeof(string):
-                return $"VARCHAR({varcharLength}})";
+                return $"VARCHAR({varcharLength})";
             case Type _ when property.PropertyType == typeof(short):
                 return "smallint";
             case Type _ when property.PropertyType == typeof(int):
