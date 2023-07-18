@@ -44,6 +44,14 @@ BEGIN
 			JOIN sys.index_columns ic ON ic.object_id = t.object_id AND ic.index_id = i.index_id
 			JOIN sys.columns c ON c.object_id = t.object_id AND c.column_id = ic.column_id
 			WHERE t.name = @tableName AND c.column_id = @columnId)
+
+		DECLARE @isIdentity bit = 
+			(SELECT CAST(COUNT(*) AS bit)
+			FROM sys.tables t
+			JOIN sys.indexes i ON i.object_id = t.object_id
+			JOIN sys.index_columns ic ON ic.object_id = t.object_id AND ic.index_id = i.index_id
+			JOIN sys.columns c ON c.object_id = t.object_id AND c.column_id = ic.column_id AND c.is_identity = 1
+			WHERE t.name = @tableName AND c.column_id = @columnId)
 	
 		DECLARE @isUniqueConstraint bit = 
 			(SELECT CAST(COUNT(*) AS bit)
@@ -93,6 +101,11 @@ BEGIN
 				SET @properties = @properties + char(9) + '[Key]' + char(13) + char(10)
 			END
 
+			IF (@isIdentity = 1)
+			BEGIN
+				SET @properties = @properties + char(9) + '[Identity]' + char(13) + char(10)
+			END
+
 			IF (@isUniqueConstraint = 1)
 			BEGIN
 				SET @properties = @properties + char(9) + '[Unique]' + char(13) + char(10)
@@ -128,16 +141,18 @@ BEGIN
 				SET @i = @i + 1
 			END
 
-			SET @properties = @properties + char(9) + '[ColumnName("' +  @columnName + '")]' + char(13) + char(10)
-			SET @properties = @properties + char(9) + 'public ' + @csharpDataType + ' ' + @camelColumnName + ' { get; set; }' + char(13) + char(10)
+			SET @properties = @properties + char(9) + '[Column("' +  @columnName + '")]' + char(13) + char(10)
+			SET @properties = @properties + char(9) + 'public ' + @csharpDataType + ' ' + @camelColumnName + ' { get; set; }' + char(13) + char(10) + char(13) + char(10)
 		END
 		ELSE
 		BEGIN
-			SET @properties = @properties + char(9) + 'public ' + @csharpDataType + ' ' + @columnName + ' { get; set; }' + char(13) + char(10)
+			SET @properties = @properties + char(9) + 'public ' + @csharpDataType + ' ' + @columnName + ' { get; set; }' + char(13) + char(10) + char(13) + char(10)
 		END
 
 		SET @columnCounter = @columnCounter - 1
 	END
+
+	SET @properties = LEFT(@properties, LEN(@properties) - 2)
 
 	SET @properties = 'public class ' + @tableName + char(13) + char(10) + '{' + char(13) + char(10) + @properties + '}'
 
