@@ -1,11 +1,11 @@
 namespace C_Sharp;
 
 [AttributeUsage(AttributeTargets.Property)]
-public class ColumnNameAttribute : Attribute
+public class ColumnAttribute : Attribute
 {
     private string name;
 
-    public ColumnNameAttribute(string name)
+    public ColumnAttribute(string name)
     {
         this.name = name;
     }

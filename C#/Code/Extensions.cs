@@ -125,7 +125,7 @@ public static class Extensions
                 continue;
             }
 
-            var columnName = property.GetCustomAttribute<ColumnNameAttribute>()?.GetName() ?? property.Name;
+            var columnName = property.GetCustomAttribute<ColumnAttribute>()?.GetName() ?? property.Name;
 
             columnBuilder.Append($"{columnName}, ");
             valueBuilder.Append($"{columnName}, ");
